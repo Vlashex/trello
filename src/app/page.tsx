@@ -187,6 +187,13 @@ export default function Home() {
 
   }
 
+  const [nextDocument, setDocument] = useState<any>(null)
+
+  useEffect(()=>{
+    setDocument(document)
+  })
+
+
   return (
     <main className="flex gap-8 p-4 items-center h-screen w-full overflow-x-scroll">
 
@@ -206,7 +213,8 @@ export default function Home() {
 
         </SortableContext>
         {
-          createPortal(
+          nextDocument !== null
+          ?createPortal(
             <DragOverlay>
               {
                 activeColumn
@@ -219,8 +227,9 @@ export default function Home() {
                 :<div/>
               }
             </DragOverlay>,
-            document.body
+            nextDocument.body
           )
+          :null
         }
       </DndContext>
       
