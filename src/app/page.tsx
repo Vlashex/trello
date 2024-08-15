@@ -1,88 +1,231 @@
 'use client'
-import { useState } from "react"
 
-type TaskContainerProps = {
-  id: string | number
-  content: string
-  delTask: (taskId: number, columnId: number) => void
-}
+import { DndContext, DragEndEvent, DragOverEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
+import { IColumn, ITask, useStore } from "./store"
+import { SortableContext, useSortable } from "@dnd-kit/sortable"
+import { useEffect, useMemo, useState } from "react"
+import { CSS } from '@dnd-kit/utilities'
+import { createPortal } from "react-dom"
 
-const TaskContainer = ({id, content, delTask}:TaskContainerProps) => {
+const TaskContainer = ({id, content, columnId}:ITask & {columnId: number}) => {
+
+  const delTask = useStore((state) => state.delTaskFromColumn)
+
+
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
+    id: id,
+    data: {
+      type: "Task",
+      task: {
+        id,
+        content
+      },
+      columnId: columnId
+    }
+  })
+
+  const style = {
+    transition,
+    transform: CSS.Transform.toString(transform)
+  }
+
+  if (isDragging) {
+    return (
+      <div 
+        ref={setNodeRef}
+        style={style}
+        className=" bg-white text-black rounded-sm p-1 opacity-50 border-solid border-[1px] border-rose-500"
+      >
+        <h1 className="mb-1">Task {id}</h1>
+        <p className="overflow-y-scroll h-20">{content}</p>
+      </div>
+    )
+  }
+
   return(
-    <div className=" bg-black rounded-sm p-1">
-      <h1 className="mb-1">Task1</h1>
-      <p className="overflow-y-scroll h-20">Lorem ipsum dolor sit amet consectetur adipisicing elit. Sequi repellat alias optio in natus facere voluptates eos debitis nesciunt iste aspernatur, autem, harum inventore ipsum culpa ut corporis qui sint?</p>
+    <div 
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className=" bg-white text-black rounded-sm p-1"
+    >
+      <div className="flex justify-between pr-2">
+        <h1 className="mb-1">Task {id}</h1>
+        <button onClick={() => delTask(id, columnId)}>del</button>
+      </div>
+      <p className="overflow-y-scroll h-20">{content}</p>
     </div>
   )
 }
-type ColumnContainerProps = {
-  id: string | number
-  title: string
-  tasks: TaskContainerProps[]
-  delColumns: (columnId: string | number) => void
-  delTaskFromColumn: (taskId: number, columnId: number) => void
-}
-const ColumnContainer = ({title, delColumns, id, tasks, delTaskFromColumn}: ColumnContainerProps) => {
+
+const ColumnContainer = ({title, id, tasks}: IColumn) => {
+
+  const delColumn = useStore((state) => state.delColumn)
+  const createTask = useStore((state) => state.createTask)
+
+  const tasksIds = useMemo(()=>{
+    return tasks.map((task) => task.id)
+  }, [tasks])
+
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
+    id: id,
+    data: {
+      type: "Column",
+      column: {
+        id,
+        title,
+        tasks
+      }
+    }
+  })
+
+  const style = {
+    transition,
+    transform: CSS.Transform.toString(transform)
+  }
+
+  if (isDragging) {
+    return (
+      <div 
+        ref={setNodeRef}
+        style={style}
+        className="flex flex-col gap-4 min-h-[400px] min-w-[250px] w-[250px] text-white  overflow-hidden bg-gray-800 rounded-sm opacity-20"/>
+    )
+  }
+
   return(
-    <div className="flex flex-col gap-4 min-h-[400px] min-w-[200px] w-[200px] bg-gray-500 text-white  overflow-hidden bg-gray-800 rounded-sm">
-      <div className="flex gap-4 items-center  p-2">
+    <div 
+      ref={setNodeRef}
+      style={style}
+
+      className="flex flex-col gap-4 min-h-[400px] min-w-[250px] w-[250px] text-white  overflow-hidden bg-gray-800 rounded-sm">
+      <div 
+        {...attributes}
+        {...listeners}
+        className="flex gap-4 items-center  p-2">
         <p>{title}</p>
-        <button className="ml-auto hover:bg-gray-400 p-1" onClick={()=>delColumns(id)}>del</button>
+        <button className="ml-auto hover:bg-gray-400 p-1" onClick={()=>delColumn(id)}>del</button>
       </div>
-      <div className="flex flex-grow flex-col px-2">
+      <div className="flex flex-grow gap-2 flex-col px-2">
+      <SortableContext items={tasksIds}>
         {
           tasks.map((value)=>
-          <TaskContainer id={value.id} content={value.content} delTask={delTaskFromColumn}/>
-        )
+            <TaskContainer key={value.id} id={value.id} content={value.content} columnId={id}/>
+          )
         }
+      </SortableContext>
       </div>
-      <button className="hover:bg-gray-400">New task</button>
+      <button className="hover:bg-gray-400" onClick={()=>createTask(id)}>New task</button>
     </div>
   )
 }
 
 export default function Home() {
 
-  const [columns, setColumns] = useState<Omit<Omit<ColumnContainerProps, 'delColumns'>, 'delTaskFromColumn'>[]>([])
+  const addColumn = useStore((state) => state.createColumn)
+  const columns = useStore((state) => state.columns)
+  const columsId = useMemo(()=> columns.map((el) => el.id), [columns])
 
-  const AddColumn = () => {
-    const newColumn = {
-      id: Math.random() * 1001,
-      title: `Column ${columns.length + 1}`,
-      tasks: []
+  const moveColumns = useStore((state)=> state.moveColumns)
+  const moveTasks = useStore((state) => state.moveTasks)
+
+  const [activeColumn, setActiveColumn] = useState<IColumn | null>(null)
+
+  const [activeTask, setActiveTask] = useState<ITask | null>(null)
+
+  const sensors = useSensors(useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 5
     }
-    setColumns([...columns, newColumn])
+  }))
+
+  const onDragStart = (e: DragStartEvent) => {
+    if (e.active.data.current?.type === "Column") {
+      setActiveColumn(e.active.data.current.column)
+      return
+    }
+    if (e.active.data.current?.type === "Task") {
+      setActiveTask(e.active.data.current.task)
+      return
+    }
   }
-  const DelColumn = (columnId: string | number) => {
-    const filteredColumns = columns.filter((el) => el.id != columnId)
-    setColumns(filteredColumns)
+
+  const onDragEnd = (e:DragEndEvent) => {
+    setActiveColumn(null)
+    setActiveTask(null)
+    const {active, over} = e
+
+    if (!over) return
+    
+    const activeColumnId = active.id as number
+    const overColumnId = over.id as number
+
+    if (activeColumnId === overColumnId) return
+
+    moveColumns(activeColumnId, overColumnId)
   }
-  const DelTaskFromColumn = (taskId:number, columnId: number) => {
-    const prevColumn = columns.filter((el)=>el.id == columnId)[0]
-    const newTasks = prevColumn.tasks.filter((el)=>el.id != taskId)
-    setColumns(()=>{
-      const prevColumns = columns.filter(el=>el.id!=columnId)
-      const newColumns = [...prevColumns, {...prevColumn, tasks: newTasks}]
-      return newColumns
-    })
+
+  const onDragOver = (e: DragOverEvent) => {
+    const {active, over} = e
+
+    if (!over) return
+
+    const isActiveTask = active.data.current?.type === "Task"
+    const isOverTask = over.data.current?.type === "Task"
+
+    if (!(isActiveTask && isOverTask)) return
+
+    const activeTaskId = active.id as number
+    const overTaskId = over.id as number
+
+    const activeColumnId = active.data.current?.columnId as number
+    const overColumnId = over.data.current?.columnId as number
+
+    
+    moveTasks(activeColumnId, overColumnId, activeTaskId, overTaskId)
+
   }
 
   return (
-    <main className="flex gap-8 overflow-x-auto p-4 items-center h-screen w-full">
-      {
-        columns.map((value) =>
-          <ColumnContainer 
-            key={value.id} 
-            id={value.id} 
-            title={value.title} 
-            delColumns={DelColumn}
-            delTaskFromColumn={DelTaskFromColumn}
-            tasks={value.tasks}
-          />
-        )
-      }
-      <div className="bg-black text-white p-2 ml-auto">
-        <button onClick={AddColumn}>Add column</button>
+    <main className="flex gap-8 p-4 items-center h-screen w-full overflow-x-scroll">
+
+      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragOver={onDragOver}>
+        <SortableContext items={columsId}>
+
+          {
+            columns.map((value) =>
+              <ColumnContainer 
+                key={value.id} 
+                id={value.id} 
+                title={value.title}
+                tasks={value.tasks}
+              />
+            )
+          }
+
+        </SortableContext>
+        {
+          createPortal(
+            <DragOverlay>
+              {
+                activeColumn
+                ?<ColumnContainer id={activeColumn?.id} tasks={activeColumn?.tasks} title={activeColumn?.title}/>
+                :<div/>
+              }
+              {
+                activeTask
+                ?<TaskContainer id={activeTask.id} content={activeTask.content} columnId={0}/>
+                :<div/>
+              }
+            </DragOverlay>,
+            document.body
+          )
+        }
+      </DndContext>
+      
+      <div className="bg-black text-white p-2 ml-auto min-w-fit">
+        <button onClick={addColumn}>Add column</button>
       </div>
     </main>
   );
