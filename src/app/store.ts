@@ -21,6 +21,7 @@ interface ColumnsState {
 
     moveColumns: (activeColumnId: number, overColumnId: number) => void
     moveTasks: (activeColumnId: number, overColumnId:number, activeTaskId: number, overTaskId: number) => void
+    moveTaskToColumn: (activeColumnId: number, overColumnId:number, activeTaskId: number) => void
 }
 
 const useStore = create<ColumnsState>()((set) => ({
@@ -138,6 +139,37 @@ const useStore = create<ColumnsState>()((set) => ({
           columns: [...columns]
         }
     }
+  }),
+  moveTaskToColumn: (activeColumnId, overColumnId, activeTaskId) => set((state) => {
+      let activeColumn = state.columns.find((el) => el.id === activeColumnId)
+      let overColumn = state.columns.find((el) => el.id === overColumnId)
+
+      console.log('AAAAA')
+      
+      
+      if (activeColumn === undefined || overColumn === undefined) return state
+
+      console.log('BBBBB')
+
+      const activeColumnIndex = state.columns.findIndex((el) => el.id === activeColumnId)
+      const overColumnIndex = state.columns.findIndex((el) => el.id === overColumnId)
+      
+      const activeTask = activeColumn.tasks.find((el) => el.id === activeTaskId)
+
+      if (activeTask === undefined) return state
+
+      console.log('CCCCC')
+
+      
+      let columns = state.columns
+      columns[activeColumnIndex].tasks = activeColumn.tasks.filter((el) => el.id !== activeTaskId)
+      columns[overColumnIndex].tasks = [...overColumn.tasks, activeTask]
+      
+      
+      return {
+        ...state,
+        columns: [...columns]
+      }
   }),
 }))
 

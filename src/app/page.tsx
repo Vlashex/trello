@@ -129,6 +129,7 @@ export default function Home() {
 
   const moveColumns = useStore((state)=> state.moveColumns)
   const moveTasks = useStore((state) => state.moveTasks)
+  const moveTaskToColumn = useStore((state) => state.moveTaskToColumn)
 
   const [activeColumn, setActiveColumn] = useState<IColumn | null>(null)
 
@@ -174,24 +175,32 @@ export default function Home() {
     const isActiveTask = active.data.current?.type === "Task"
     const isOverTask = over.data.current?.type === "Task"
 
-    if (!(isActiveTask && isOverTask)) return
+    if (isActiveTask && isOverTask) {
 
-    const activeTaskId = active.id as number
-    const overTaskId = over.id as number
+      const activeTaskId = active.id as number
+      const overTaskId = over.id as number
 
-    const activeColumnId = active.data.current?.columnId as number
-    const overColumnId = over.data.current?.columnId as number
+      const activeColumnId = active.data.current?.columnId as number
+      const overColumnId = over.data.current?.columnId as number
 
-    
-    moveTasks(activeColumnId, overColumnId, activeTaskId, overTaskId)
+      
+      moveTasks(activeColumnId, overColumnId, activeTaskId, overTaskId)
+    } else if (isActiveTask) {
+      const activeTaskId = active.id as number
 
+      const activeColumnId = active.data.current?.columnId as number
+      const overColumnId = over.id as number
+
+      
+      moveTaskToColumn(activeColumnId, overColumnId, activeTaskId)
+    }
   }
 
   const [nextDocument, setDocument] = useState<any>(null)
 
   useEffect(()=>{
     setDocument(document)
-  })
+  }, [])
 
 
   return (
