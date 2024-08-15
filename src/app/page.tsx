@@ -164,7 +164,14 @@ export default function Home() {
 
     if (activeColumnId === overColumnId) return
 
-    moveColumns(activeColumnId, overColumnId)
+    const isActiveColumn = active.data.current?.type === "Column"
+    const isOverColumn = over.data.current?.type === "Column"
+
+
+    if (isActiveColumn && isOverColumn) {
+      moveColumns(activeColumnId, overColumnId)
+    }
+    
   }
 
   const onDragOver = (e: DragOverEvent) => {
